@@ -1,33 +1,62 @@
 #include <iostream>
-#include <fstream>
 #include <string>
-#define FILE "/sys/class/backlight/intel_backlight/brightness"
+#include <stdlib.h>
+#include <stdio.h>
+#include <fstream>
+#include <string.h>
 
 using namespace std;
 
-void error(const char* error, int errnum = 1) {
-	std::cout << error << std::endl;
-	exit(errnum);
+#define BL_DIR "/sys/class/backlight/intel_backlight/"
+#define MAX_FILE BL_DIR"max_brightness"
+#define FILE BL_DIR"brightness"
+
+int write(const char* path, int value) {
+	ofstream ofile(path);
+	if (!ofile.is_open()) {
+		return -1;
+	}
+	ofile << value;
+	ofile.close();
+	return 0;
 }
 
-void write(int val) {
-	ofstream i;
-	i.open(FILE, ios::trunc | ios::out);
-	if (!i.is_open())
-		error("Could not open file\n\tAre you privileged?");
-	i << val;
-	i.close();
+int read(const char* path) {
+	int value = -1;
+	ifstream ifile(path);
+	if (!ifile.is_open()) {
+		return -1;
+	}
+	ifile >> value;
+	return value;
+}
+
+void error(const char* error, int errcode) {
+	printf("%s\n", error);
+	exit(errcode);
+	return;
 }
 
 int main(int argc, char** argv) {
-	int val = -1;
+	int newbrightness = -1;
+	if (argc < 2) {
+		int cur_bat = read(FILE);
+		int max_bat = read(MAX_FILE);
+		printf("%.1f%% %i\n", float(cur_bat)*(1/float(max_bat))*100.0f, cur_bat);
+		return 0;
+		//error("Not enough arguments", 1);
+	}
+	if (sscanf(argv[1], "%i", &newbrightness) != 1)
+		error("Invalid arguments", 1);
 
-	if (argc < 2)
-		error("Not enough arguments");
+	if (strcmp(argv[1], "%")) {
+		if (write(FILE, float(newbrightness)*0.01*float(read(MAX_FILE))) == -1)
+			error("Can't access file, try as root?", 1);
+		return 0;
+	}
 
-	if (sscanf(argv[1], "%i", &val) != 1)
-		error("Invalid arguments");
+	if (write(FILE, newbrightness) == -1)
+		error("Can't access file, try as root?", 1);
 
-	write(val);
 	return 0;
 }
